@@ -67,7 +67,7 @@ def generate_stock_report(ticker: str) -> str:
     """
     
     response = client.models.generate_content(
-        model='gemini-2.5-pro',
+        model='gemini-2.5-flash',
         contents=user_prompt,
         config=types.GenerateContentConfig(
             system_instruction=REPORT_SYSTEM_PROMPT,
