@@ -1,9 +1,17 @@
 import os
+import requests
 from openai import OpenAI
 import yfinance as yf
 
+# Create a custom session to bypass Yahoo Finance IP blocks
+session = requests.Session()
+session.headers.update({
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+})
+
 def get_stock_fundamentals(ticker_symbol: str):
-    stock = yf.Ticker(ticker_symbol)
+    # Pass the disguised session to yfinance
+    stock = yf.Ticker(ticker_symbol, session=session)
     info = stock.info
     income_stmt = stock.financials
     balance_sheet = stock.balance_sheet
