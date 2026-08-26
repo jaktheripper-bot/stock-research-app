@@ -9,8 +9,25 @@ session.headers.update({
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 })
 
+def resolve_ticker(query: str, session) -> str:
+    search_url = f"https://query2.finance.yahoo.com/v1/finance/search?q={query}"
+    try:
+        response = session.get(search_url, timeout=5)
+        response.raise_for_status()
+        data = response.json()
+        if "quotes" in data and len(data["quotes"]) > 0:
+            return data["quotes"][0]["symbol"]
+    except Exception:
+        return None
+    return None
+
 @st.cache_data(ttl=3600)
-def get_stock_fundamentals(ticker_symbol: str):
+def get_stock_fundamentals(query: str):
+    ticker_symbol = resolve_ticker(query, session)
+    
+    if not ticker_symbol:
+        raise ValueError(f"Could not find a valid publicly traded ticker for '{query}'. It may be unlisted or misspelled.")
+        
     stock = yf.Ticker(ticker_symbol, session=session)
     info = stock.info
     income_stmt = stock.financials
