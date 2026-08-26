@@ -9,6 +9,7 @@ def get_stock_fundamentals(ticker_symbol: str):
     income_stmt = stock.financials
     balance_sheet = stock.balance_sheet
     
+    # Keep data payload compact to minimize token consumption and avoid 429 rate limits
     data = {
         "short_name": info.get("shortName", ticker_symbol),
         "sector": info.get("sector", "N/A"),
@@ -20,8 +21,8 @@ def get_stock_fundamentals(ticker_symbol: str):
         "beta": info.get("beta", "N/A"),
         "52_week_high": info.get("fiftyTwoWeekHigh", "N/A"),
         "52_week_low": info.get("fiftyTwoWeekLow", "N/A"),
-        "recent_income_statement": income_stmt.iloc[:, :3].to_string() if not income_stmt.empty else "N/A",
-        "recent_balance_sheet": balance_sheet.iloc[:, :3].to_string() if not balance_sheet.empty else "N/A"
+        "recent_income_statement": income_stmt.iloc[:5, :1].to_string() if not income_stmt.empty else "N/A",
+        "recent_balance_sheet": balance_sheet.iloc[:5, :1].to_string() if not balance_sheet.empty else "N/A"
     }
     return data
 
@@ -67,7 +68,7 @@ def generate_stock_report(ticker: str) -> str:
     """
     
     response = client.models.generate_content(
-        model='gemini-3.6-flash',
+        model='gemini-2.5-flash',
         contents=user_prompt,
         config=types.GenerateContentConfig(
             system_instruction=REPORT_SYSTEM_PROMPT,
