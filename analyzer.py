@@ -45,7 +45,7 @@ def generate_stock_report(ticker: str) -> str:
     user_prompt = f"Generate the research report for ticker: {ticker.upper()}\nLive data:\n{stock_data}"
     
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-3.6-flash",
         contents=user_prompt,
         config=genai.types.GenerateContentConfig(
             system_instruction=REPORT_SYSTEM_PROMPT,
