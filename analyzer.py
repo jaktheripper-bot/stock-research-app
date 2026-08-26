@@ -1,6 +1,5 @@
 import os
-from google import genai
-from google.genai import types
+from openai import OpenAI
 import yfinance as yf
 
 def get_stock_fundamentals(ticker_symbol: str):
@@ -9,7 +8,6 @@ def get_stock_fundamentals(ticker_symbol: str):
     income_stmt = stock.financials
     balance_sheet = stock.balance_sheet
     
-    # Keep data payload compact to minimize token consumption and avoid 429 rate limits
     data = {
         "short_name": info.get("shortName", ticker_symbol),
         "sector": info.get("sector", "N/A"),
@@ -58,8 +56,8 @@ You must strictly follow this exact structural format and use Markdown:
 
 def generate_stock_report(ticker: str) -> str:
     stock_data = get_stock_fundamentals(ticker)
-    api_key = os.environ.get("GEMINI_API_KEY")
-    client = genai.Client(api_key=api_key)
+    api_key = os.environ.get("OPENAI_API_KEY")
+    client = OpenAI(api_key=api_key)
     
     user_prompt = f"""
     Generate the research report for ticker: {ticker.upper()}
@@ -67,13 +65,13 @@ def generate_stock_report(ticker: str) -> str:
     {stock_data}
     """
     
-    response = client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=user_prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=REPORT_SYSTEM_PROMPT,
-            temperature=0.2,
-        )
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": REPORT_SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt}
+        ],
+        temperature=0.2,
     )
     
-    return response.text
+    return response.choices[0].message.content
