@@ -7,24 +7,24 @@ from google import genai
 def get_stock_fundamentals(query: str):
     api_key = st.secrets.get("TWELVE_DATA_API_KEY", "demo")
     
-    # Resolve query to a structured symbol using Twelve Data search
-    search_url = f"https://api.twelvedata.com/symbol_search?symbol={query}"
+    search_url = f"https://api.twelvedata.com/symbol_search?symbol={query}&apikey={api_key}"
     response = requests.get(search_url)
     response.raise_for_status()
     result = response.json()
+    
+    if "code" in result and result["code"] != 200:
+        raise ValueError(f"Twelve Data API Error: {result.get('message', 'Unknown error')}")
     
     matches = result.get("data", [])
     if not matches:
         raise ValueError(f"Could not find a valid ticker for '{query}'.")
         
-    # Default to first match, but prioritize Indian exchanges (NSE/BSE) if available
     ticker_symbol = matches[0]["symbol"]
     for match in matches:
         if match.get("exchange") in ["NSE", "BSE"]:
             ticker_symbol = match["symbol"]
             break
 
-    # Fetch company profile and key statistics
     profile_res = requests.get(f"https://api.twelvedata.com/profile?symbol={ticker_symbol}&apikey={api_key}").json()
     stats_res = requests.get(f"https://api.twelvedata.com/statistics?symbol={ticker_symbol}&apikey={api_key}").json()
     
@@ -52,11 +52,10 @@ def generate_stock_report(ticker: str) -> str:
     user_prompt = f"Generate the research report for: {stock_data.get('short_name')} ({ticker.upper})}\nData: {stock_data}"
     
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-3.6-flash",
         contents=user_prompt,
         config=genai.types.GenerateContentConfig(
-            system_instruction=REPORT_SYSTEM_PROMPT,
-            temperature=0.2,
+            system_instruction=REPORT_SYSTEM_PROMPT
         ),
     )
     return response.text
