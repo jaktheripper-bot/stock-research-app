@@ -1,6 +1,6 @@
 import os
 import streamlit as st
-from analyzer import generate_stock_report
+from analyzer generate_stock_report
 
 st.set_page_config(page_title="Stock Research Terminal", layout="wide")
 st.title("Automated Equity Research Terminal")
