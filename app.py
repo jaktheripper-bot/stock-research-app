@@ -1,12 +1,11 @@
-import os
 import streamlit as st
-from analyzer generate_stock_report
+from analyzer import generate_stock_report
 
 st.set_page_config(page_title="Stock Research Terminal", layout="wide")
 st.title("Automated Equity Research Terminal")
 
 api_key = st.secrets.get("GEMINI_API_KEY")
-ticker_input = st.text_input("Enter Stock Ticker (e.g., AAPL):", "").upper()
+ticker_input = st.text_input("Enter Company Name or Ticker (e.g., Apple, Tata Motors, AAPL):", "").upper()
 
 if st.button("Generate Research Report"):
     if not api_key:
@@ -19,4 +18,4 @@ if st.button("Generate Research Report"):
                 report_text = generate_stock_report(ticker_input)
                 st.markdown(report_text)
             except Exception as e:
-                st.error(f"Error generating report: {e}")
+                st.error(str(e))
