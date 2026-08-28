@@ -2,56 +2,46 @@ import os
 import requests
 import streamlit as st
 from google import genai
-import yfinance as yf
-
-session = requests.Session()
-session.headers.update({
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-})
-
-def resolve_ticker(query: str, session) -> str:
-    search_url = f"https://query2.finance.yahoo.com/v1/finance/search?q={query}"
-    try:
-        response = session.get(search_url, timeout=5)
-        response.raise_for_status()
-        data = response.json()
-        if "quotes" in data and len(data["quotes"]) > 0:
-            return data["quotes"][0]["symbol"]
-    except Exception:
-        return None
-    return None
 
 @st.cache_data(ttl=3600)
 def get_stock_fundamentals(query: str):
-    ticker_symbol = resolve_ticker(query, session)
+    api_key = st.secrets.get("TWELVE_DATA_API_KEY", "demo")
     
-    if not ticker_symbol:
-        raise ValueError(f"Could not find a valid publicly traded ticker for '{query}'. It may be unlisted or misspelled.")
+    # Resolve query to a structured symbol using Twelve Data search
+    search_url = f"https://api.twelvedata.com/symbol_search?symbol={query}"
+    response = requests.get(search_url)
+    response.raise_for_status()
+    result = response.json()
+    
+    matches = result.get("data", [])
+    if not matches:
+        raise ValueError(f"Could not find a valid ticker for '{query}'.")
         
-    stock = yf.Ticker(ticker_symbol, session=session)
-    info = stock.info
-    income_stmt = stock.financials
-    balance_sheet = stock.balance_sheet
+    # Default to first match, but prioritize Indian exchanges (NSE/BSE) if available
+    ticker_symbol = matches[0]["symbol"]
+    for match in matches:
+        if match.get("exchange") in ["NSE", "BSE"]:
+            ticker_symbol = match["symbol"]
+            break
+
+    # Fetch company profile and key statistics
+    profile_res = requests.get(f"https://api.twelvedata.com/profile?symbol={ticker_symbol}&apikey={api_key}").json()
+    stats_res = requests.get(f"https://api.twelvedata.com/statistics?symbol={ticker_symbol}&apikey={api_key}").json()
+    
+    valuations = stats_res.get("statistics", {}).get("valuations_metrics", {})
     
     data = {
-        "short_name": info.get("shortName", ticker_symbol),
-        "sector": info.get("sector", "N/A"),
-        "industry": info.get("industry", "N/A"),
-        "pe_ratio": info.get("trailingPE", "N/A"),
-        "recent_income_statement": income_stmt.iloc[:5, :1].to_string() if not income_stmt.empty else "N/A",
-        "recent_balance_sheet": balance_sheet.iloc[:5, :1].to_string() if not balance_sheet.empty else "N/A"
+        "short_name": profile_res.get("name", ticker_symbol),
+        "sector": profile_res.get("sector", "N/A"),
+        "industry": profile_res.get("industry", "N/A"),
+        "market_cap": profile_res.get("market_capitalization", "N/A"),
+        "pe_ratio": valuations.get("trailing_pe", "N/A"),
+        "description": profile_res.get("description", "N/A")
     }
     return data
 
 REPORT_SYSTEM_PROMPT = """
-You are an equity research analyst. Your task is to generate a comprehensive stock research report based on the provided financial metrics and data. 
-You must strictly follow this exact structural format and use Markdown:
-# Equity Research Report: [Company Name] ([Ticker])
-## 1. Executive Summary & Verdict
-## 2. Financial Performance & Balance Sheet Health
-## 3. Valuation & Market Context
-## 4. Key Risks & Bear Case
-## 5. Final Investment Conclusion
+You are an equity research analyst. Generate a comprehensive stock research report based on the provided metrics and data using strict Markdown.
 """
 
 def generate_stock_report(ticker: str) -> str:
@@ -59,10 +49,10 @@ def generate_stock_report(ticker: str) -> str:
     api_key = os.environ.get("GEMINI_API_KEY")
     client = genai.Client(api_key=api_key)
     
-    user_prompt = f"Generate the research report for ticker: {ticker.upper()}\nLive data:\n{stock_data}"
+    user_prompt = f"Generate the research report for: {stock_data.get('short_name')} ({ticker.upper})}\nData: {stock_data}"
     
     response = client.models.generate_content(
-        model="gemini-3.6-flash",
+        model="gemini-2.5-flash",
         contents=user_prompt,
         config=genai.types.GenerateContentConfig(
             system_instruction=REPORT_SYSTEM_PROMPT,
