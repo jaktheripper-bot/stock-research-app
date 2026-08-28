@@ -46,10 +46,11 @@ You are an equity research analyst. Generate a comprehensive stock research repo
 
 def generate_stock_report(ticker: str) -> str:
     stock_data = get_stock_fundamentals(ticker)
-    api_key = os.environ.get("GEMINI_API_KEY")
+    api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     client = genai.Client(api_key=api_key)
     
-    user_prompt = f"Generate the research report for: {stock_data.get('short_name')} ({ticker.upper})}\nData: {stock_data}"
+    # Fixed f-string syntax error by properly calling {ticker.upper()}
+    user_prompt = f"Generate the research report for: {stock_data.get('short_name')} ({ticker.upper()})\nData: {stock_data}"
     
     response = client.models.generate_content(
         model="gemini-3.6-flash",
