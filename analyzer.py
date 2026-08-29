@@ -2,6 +2,7 @@ import os
 import requests
 import streamlit as st
 from google import genai
+from normalizer import normalize_stock_data
 
 @st.cache_data(ttl=3600)
 def get_stock_fundamentals(query: str):
@@ -20,9 +21,12 @@ def get_stock_fundamentals(query: str):
         raise ValueError(f"Could not find a valid ticker for '{query}'.")
         
     ticker_symbol = matches[0]["symbol"]
+    exchange = matches[0].get("exchange", "NSE")
+    
     for match in matches:
         if match.get("exchange") in ["NSE", "BSE"]:
             ticker_symbol = match["symbol"]
+            exchange = match["exchange"]
             break
 
     profile_res = requests.get(f"https://api.twelvedata.com/profile?symbol={ticker_symbol}&apikey={api_key}").json()
@@ -30,7 +34,8 @@ def get_stock_fundamentals(query: str):
     
     valuations = stats_res.get("statistics", {}).get("valuations_metrics", {})
     
-    data = {
+    raw_data = {
+        "ticker": ticker_symbol,
         "short_name": profile_res.get("name", ticker_symbol),
         "sector": profile_res.get("sector", "N/A"),
         "industry": profile_res.get("industry", "N/A"),
@@ -38,10 +43,13 @@ def get_stock_fundamentals(query: str):
         "pe_ratio": valuations.get("trailing_pe", "N/A"),
         "description": profile_res.get("description", "N/A")
     }
-    return data
+    
+    # Apply normalization to prevent LLM currency confusion
+    return normalize_stock_data(raw_data, exchange=exchange)
 
 REPORT_SYSTEM_PROMPT = """
-You are an equity research analyst. Generate a comprehensive stock research report based on the provided metrics and data using strict Markdown.
+You are an equity research analyst. Generate a comprehensive stock research report based on the provided metrics using strict Markdown. 
+All financial figures provided are in Indian Rupees (INR) unless explicitly stated otherwise. Express market values in Crores (Cr).
 """
 
 def generate_stock_report(ticker: str) -> str:
@@ -49,8 +57,7 @@ def generate_stock_report(ticker: str) -> str:
     api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     client = genai.Client(api_key=api_key)
     
-    # Fixed f-string syntax error by properly calling {ticker.upper()}
-    user_prompt = f"Generate the research report for: {stock_data.get('short_name')} ({ticker.upper()})\nData: {stock_data}"
+    user_prompt = f"Generate the research report for: {stock_data.get('short_name')} ({stock_data.get('ticker')})\nData: {stock_data}"
     
     response = client.models.generate_content(
         model="gemini-3.6-flash",
