@@ -1,5 +1,6 @@
 streamlit
+supabase==2.12.0
 pandas
 google-genai
 requests
-supabase==2.12.0
+pytest
